@@ -1,0 +1,87 @@
+IMAGE ?= muzzle:dev
+PORT ?= 8000
+UV ?= uv
+TORCH_BACKEND ?= auto
+API_URL ?= ws://127.0.0.1:$(PORT)/v1/sessions
+TEXT ?= Hello from muzzle, streaming through deez nuts in yo face, bee-atch.
+PLAYER ?= auto
+PCM_OUT ?=
+PCM_ARGS = $(if $(PCM_OUT),--save-pcm "$(PCM_OUT)",)
+STT_SECONDS ?= 10
+STT_INPUT ?=
+STT_ARGS = $(if $(STT_INPUT),--input-pcm "$(STT_INPUT)",--duration-seconds "$(STT_SECONDS)")
+
+.PHONY: help sync sync-real check-real-deps torch-reinstall torch-check test dev dev-real dev-fake example-tts example-stt example-pcm docker-build docker-build-real docker-test docker-run docker-run-fake docker-run-real
+
+help:
+	@printf '%s\n' \
+		'Targets:' \
+		'  make sync              Install local test dependencies with uv' \
+		'  make sync-real         Install real Chatterbox/Whisper deps and repair torch backend' \
+		'  make torch-reinstall   Reinstall torch/torchaudio with uv torch backend selection' \
+		'  make torch-check       Print the installed torch/CUDA/GPU details' \
+		'  make test              Run fake-backend API contract tests' \
+			'  make dev               Run the real API service locally after sync-real' \
+		'  make dev-fake          Run fake API plumbing service locally' \
+		'  make example-tts       Call real /v1/sessions TTS and play through PipeWire' \
+		'  make example-stt       Record mic with PipeWire and stream it to real STT' \
+		'  make example-pcm       Save streamed real TTS as raw pcm_s16le for replay' \
+		'  make docker-test       Build and run fake-backend tests in Docker' \
+		'  make docker-run        Run real API service in Docker' \
+		'  make docker-run-fake   Run fake API plumbing service in Docker' \
+		'' \
+		'Variables:' \
+		'  TORCH_BACKEND=auto     uv torch backend for real installs; override with cu128/cu130/etc'
+
+sync:
+	$(UV) sync --extra test
+
+sync-real:
+	UV_TORCH_BACKEND=$(TORCH_BACKEND) $(UV) sync --extra real --extra test
+	$(MAKE) torch-reinstall
+
+check-real-deps:
+	@$(UV) run --no-sync python -c "import importlib.util, sys; modules = ('chatterbox', 'faster_whisper', 'torch', 'torchaudio'); missing = [m for m in modules if importlib.util.find_spec(m) is None]; sys.stderr.write('Missing real dependencies: ' + ', '.join(missing) + '\nRun: make sync-real\n') if missing else None; raise SystemExit(bool(missing))"
+
+torch-reinstall:
+	UV_TORCH_BACKEND=$(TORCH_BACKEND) $(UV) pip install --torch-backend "$(TORCH_BACKEND)" --upgrade --reinstall torch torchaudio
+
+torch-check:
+	$(UV) run --no-sync python -c "import torch; print('torch', torch.__version__, 'cuda', torch.version.cuda); print('available', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no cuda'); print('capability', torch.cuda.get_device_capability(0) if torch.cuda.is_available() else None)"
+
+test:
+	MUZZLE_MODEL_BACKEND=fake $(UV) run --extra test pytest -q
+
+dev: dev-real
+
+dev-real: check-real-deps
+	MUZZLE_MODEL_BACKEND=real $(UV) run --no-sync uvicorn muzzle.app:create_app --factory --host 127.0.0.1 --port $(PORT)
+
+dev-fake:
+	MUZZLE_MODEL_BACKEND=fake $(UV) run uvicorn muzzle.app:create_app --factory --reload --host 127.0.0.1 --port $(PORT)
+
+example-tts:
+	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --player "$(PLAYER)" $(PCM_ARGS)
+
+example-stt:
+	$(UV) run --no-sync python examples/stream_stt_pipewire.py --url "$(API_URL)" $(STT_ARGS)
+
+example-pcm:
+	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --player none --save-pcm "$(if $(PCM_OUT),$(PCM_OUT),/tmp/muzzle-example.pcm)"
+
+docker-build:
+	docker build --build-arg UV_SYNC_EXTRAS="--extra test" -t $(IMAGE) .
+
+docker-build-real:
+	docker build --build-arg UV_SYNC_EXTRAS="--extra real --extra test" --build-arg REAL_BACKEND=1 --build-arg UV_TORCH_BACKEND="$(TORCH_BACKEND)" -t $(IMAGE)-real .
+
+docker-test: docker-build
+	docker run --rm -e MUZZLE_MODEL_BACKEND=fake $(IMAGE) uv run --frozen --extra test pytest -q
+
+docker-run-fake: docker-build
+	docker run --rm -it -p $(PORT):8000 -e MUZZLE_MODEL_BACKEND=fake $(IMAGE)
+
+docker-run: docker-run-real
+
+docker-run-real: docker-build-real
+	docker run --rm -it -p $(PORT):8000 -e MUZZLE_MODEL_BACKEND=real $(IMAGE)-real
