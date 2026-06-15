@@ -7,44 +7,23 @@ Muzzle runs a FastAPI service with:
 - streaming TTS from Chatterbox Turbo
 - streaming STT from Faster-Whisper
 - WebSocket sessions for live mic input and generated audio output
-- a fake backend for fast API tests without downloading model weights
 
 ## Quickstart
 
-Install the lightweight test/dev dependencies:
-
-```bash
-make sync
-```
-
-Run the fake backend first. It starts quickly and proves the API works:
-
-```bash
-make dev-fake
-```
-
-In another terminal:
-
-```bash
-make test
-```
-
-## Real Voice Mode
-
-Install the real TTS/STT dependencies:
+Install the TTS/STT dependencies:
 
 ```bash
 make sync-real
 make torch-check
 ```
 
-Start the real service:
+Start the service:
 
 ```bash
 make dev
 ```
 
-The first real startup downloads model weights for Chatterbox and Whisper. That can take a while.
+The first startup downloads model weights for Chatterbox and Whisper. That can take a while.
 
 If your GPU backend is not detected correctly, pick it explicitly:
 
@@ -69,10 +48,10 @@ Use higher quality audio:
 make example-tts QUALITY=high
 ```
 
-Disable playback and only test the protocol:
+Disable playback and just print events:
 
 ```bash
-make example-tts TEXT="Testing the streaming path." QUALITY=high PLAYER=none
+make example-tts TEXT="Hello from Muzzle." QUALITY=high PLAYER=none
 ```
 
 Save raw PCM output:
@@ -203,13 +182,13 @@ The built-in `default` voice cannot be deleted.
 
 ## Docker
 
-Fake backend test image:
+Run tests in Docker:
 
 ```bash
 make docker-test
 ```
 
-Real backend image:
+Run the service in Docker:
 
 ```bash
 TORCH_BACKEND=cu128 make docker-build-real
@@ -217,6 +196,23 @@ make docker-run
 ```
 
 Use an explicit `TORCH_BACKEND` when Docker cannot see the NVIDIA driver during build.
+
+## Testing
+
+Run the API tests:
+
+```bash
+make test
+```
+
+The tests use the fake backend, so they do not download model weights.
+
+You can also run the fake server directly while working on API plumbing:
+
+```bash
+make sync
+make dev-fake
+```
 
 ## Development
 
@@ -233,7 +229,7 @@ make example-stt
 make torch-check
 ```
 
-Real TTS uses the pinned streaming Chatterbox fork:
+TTS uses the pinned streaming Chatterbox fork:
 
 ```text
 github.com/chrishayen/chatterbox @ ce5a900dbdbc776eeb3d00c1c1607143c7604a5b
