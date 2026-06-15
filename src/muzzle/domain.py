@@ -4,6 +4,29 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+TTSQuality = Literal["fast", "balanced", "high"]
+
+TTS_QUALITY_PROFILES = {
+    "fast": {
+        "chunk_tokens": 24,
+        "crossfade_ms": 12.0,
+        "temperature": 0.8,
+        "top_p": 0.95,
+    },
+    "balanced": {
+        "chunk_tokens": 48,
+        "crossfade_ms": 24.0,
+        "temperature": 0.72,
+        "top_p": 0.92,
+    },
+    "high": {
+        "chunk_tokens": 64,
+        "crossfade_ms": 36.0,
+        "temperature": 0.65,
+        "top_p": 0.9,
+    },
+}
+
 
 @dataclass(frozen=True)
 class VoiceInfo:
@@ -42,10 +65,11 @@ class TTSOptions:
     request_id: str
     text: str
     voice_id: str
-    chunk_tokens: int = 24
-    crossfade_ms: float = 12.0
-    temperature: float = 0.8
-    top_p: float = 0.95
+    quality: TTSQuality = "balanced"
+    chunk_tokens: int = 48
+    crossfade_ms: float = 24.0
+    temperature: float = 0.72
+    top_p: float = 0.92
     top_k: int = 1000
     repetition_penalty: float = 1.2
     max_gen_len: int = 1000
@@ -71,4 +95,3 @@ class TranscriptEvent:
     start_ms: int | None = None
     end_ms: int | None = None
     language: str | None = None
-

@@ -83,10 +83,10 @@ make dev
 make example-tts
 ```
 
-The TTS example uses `pw-cat` when available, which routes audio through PipeWire to the default desktop sink. Override the prompt or disable playback for a protocol smoke test:
+The TTS example uses `pw-cat` when available, which routes audio through PipeWire to the default desktop sink. Override the prompt, quality profile, or disable playback for a protocol smoke test:
 
 ```bash
-make example-tts TEXT="Testing the streaming path." PLAYER=none
+make example-tts TEXT="Testing the streaming path." QUALITY=high PLAYER=none
 ```
 
 To test real STT from your microphone:
@@ -158,13 +158,15 @@ Client JSON events:
 
 ```json
 {"type":"session.configure","voice_id":"default","stt_language":"en"}
-{"type":"tts.speak","request_id":"tts-1","text":"Hello from Chatterbox Turbo."}
+{"type":"tts.speak","request_id":"tts-1","text":"Hello from Chatterbox Turbo.","quality":"high"}
 {"type":"tts.cancel","request_id":"tts-1"}
 {"type":"input_audio.commit"}
 {"type":"session.close"}
 ```
 
 Client binary frames are raw 16 kHz mono signed 16-bit little-endian PCM. Keep frames around 20-100 ms for normal interactive use.
+
+TTS `quality` can be `fast`, `balanced`, or `high`. Higher quality uses larger generation chunks, more crossfade, and lower sampling randomness, trading latency for smoother audio. Explicit `chunk_tokens`, `crossfade_ms`, `temperature`, or `top_p` values override the selected profile.
 
 TTS output order is deliberate:
 

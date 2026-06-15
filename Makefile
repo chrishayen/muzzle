@@ -4,6 +4,7 @@ UV ?= uv
 TORCH_BACKEND ?= auto
 API_URL ?= ws://127.0.0.1:$(PORT)/v1/sessions
 TEXT ?= Hello from muzzle, streaming through deez nuts in yo face, bee-atch.
+QUALITY ?= balanced
 PLAYER ?= auto
 PCM_OUT ?=
 PCM_ARGS = $(if $(PCM_OUT),--save-pcm "$(PCM_OUT)",)
@@ -61,13 +62,13 @@ dev-fake:
 	MUZZLE_MODEL_BACKEND=fake $(UV) run uvicorn muzzle.app:create_app --factory --reload --host 127.0.0.1 --port $(PORT)
 
 example-tts:
-	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --player "$(PLAYER)" $(PCM_ARGS)
+	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --quality "$(QUALITY)" --player "$(PLAYER)" $(PCM_ARGS)
 
 example-stt:
 	$(UV) run --no-sync python examples/stream_stt_pipewire.py --url "$(API_URL)" $(STT_ARGS)
 
 example-pcm:
-	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --player none --save-pcm "$(if $(PCM_OUT),$(PCM_OUT),/tmp/muzzle-example.pcm)"
+	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --quality "$(QUALITY)" --player none --save-pcm "$(if $(PCM_OUT),$(PCM_OUT),/tmp/muzzle-example.pcm)"
 
 docker-build:
 	docker build --build-arg UV_SYNC_EXTRAS="--extra test" -t $(IMAGE) .

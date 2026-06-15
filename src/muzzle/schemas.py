@@ -4,6 +4,8 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
+from .domain import TTSQuality
+
 SUPPORTED_INPUT_FORMAT = "pcm_s16le"
 SUPPORTED_OUTPUT_FORMAT = "pcm_s16le"
 INPUT_SAMPLE_RATE = 16_000
@@ -23,10 +25,11 @@ class TTSSpeakEvent(BaseModel):
     request_id: str = Field(min_length=1, max_length=128)
     text: str = Field(min_length=1, max_length=8000)
     voice_id: str | None = None
-    chunk_tokens: int = Field(default=24, ge=1, le=128)
-    crossfade_ms: float = Field(default=12.0, ge=0, le=100)
-    temperature: float = Field(default=0.8, ge=0, le=2)
-    top_p: float = Field(default=0.95, gt=0, le=1)
+    quality: TTSQuality = "balanced"
+    chunk_tokens: int = Field(default=48, ge=1, le=128)
+    crossfade_ms: float = Field(default=24.0, ge=0, le=100)
+    temperature: float = Field(default=0.72, ge=0, le=2)
+    top_p: float = Field(default=0.92, gt=0, le=1)
     top_k: int = Field(default=1000, ge=1, le=5000)
     repetition_penalty: float = Field(default=1.2, ge=0.1, le=10)
     max_gen_len: int = Field(default=1000, ge=1, le=4000)

@@ -41,6 +41,23 @@ def _silence_frame(duration_ms: int = 100, sample_rate: int = 16_000) -> bytes:
     return b"\x00\x00" * int(sample_rate * duration_ms / 1000)
 
 
+def _collect_tts_chunks(ws, message: dict) -> list[dict]:
+    ws.send_json(message)
+    started = ws.receive_json()
+    assert started["type"] == "tts.started"
+    assert started["request_id"] == message["request_id"]
+
+    chunks = []
+    while True:
+        event = ws.receive_json()
+        if event["type"] == "tts.done":
+            assert event == {"type": "tts.done", "request_id": message["request_id"], "status": "completed"}
+            return chunks
+        assert event["type"] == "tts.audio.chunk"
+        chunks.append(event)
+        assert len(ws.receive_bytes()) == event["bytes"]
+
+
 def test_health_and_default_voice(tmp_path):
     with _client(tmp_path) as client:
         response = client.get("/healthz")
@@ -145,3 +162,27 @@ def test_websocket_bad_audio_error(tmp_path):
             error = ws.receive_json()
             assert error["type"] == "error"
             assert error["code"] == "bad_audio"
+
+
+def test_tts_quality_profile_and_explicit_overrides(tmp_path):
+    with _client(tmp_path) as client:
+        with client.websocket_connect("/v1/sessions") as ws:
+            assert ws.receive_json()["type"] == "session.created"
+
+            high_chunks = _collect_tts_chunks(
+                ws,
+                {"type": "tts.speak", "request_id": "tts-high", "text": "hello", "quality": "high"},
+            )
+            assert high_chunks[0]["generated_tokens"] == 64
+
+            override_chunks = _collect_tts_chunks(
+                ws,
+                {
+                    "type": "tts.speak",
+                    "request_id": "tts-override",
+                    "text": "hello",
+                    "quality": "high",
+                    "chunk_tokens": 12,
+                },
+            )
+            assert override_chunks[0]["generated_tokens"] == 12

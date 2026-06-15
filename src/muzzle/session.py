@@ -9,7 +9,7 @@ from starlette.websockets import WebSocketState
 from .adapters.base import STTAdapter, TTSAdapter
 from .audio import INPUT_SAMPLE_RATE, AudioFormatError, validate_pcm16_frame
 from .config import Settings
-from .domain import TTSOptions, TranscriptEvent
+from .domain import TTSOptions, TTS_QUALITY_PROFILES, TranscriptEvent
 from .schemas import (
     ErrorEvent,
     InputAudioCommitEvent,
@@ -126,18 +126,7 @@ class VoiceSession:
                 await self._send_event(TTSDoneEvent(request_id=event.request_id, status="error"))
                 return
 
-        options = TTSOptions(
-            request_id=event.request_id,
-            text=event.text,
-            voice_id=voice_id,
-            chunk_tokens=event.chunk_tokens,
-            crossfade_ms=event.crossfade_ms,
-            temperature=event.temperature,
-            top_p=event.top_p,
-            top_k=event.top_k,
-            repetition_penalty=event.repetition_penalty,
-            max_gen_len=event.max_gen_len,
-        )
+        options = _tts_options_from_event(event, voice_id)
 
         try:
             await self._send_event(TTSStartedEvent(request_id=event.request_id, voice_id=voice_id))
@@ -211,3 +200,21 @@ class VoiceSession:
         async with self.send_lock:
             await self.websocket.send_json(event_payload(event))
             await self.websocket.send_bytes(chunk.audio)
+
+
+def _tts_options_from_event(event: TTSSpeakEvent, voice_id: str) -> TTSOptions:
+    profile_options = dict(TTS_QUALITY_PROFILES[event.quality])
+    for field in ("chunk_tokens", "crossfade_ms", "temperature", "top_p"):
+        if field in event.model_fields_set:
+            profile_options[field] = getattr(event, field)
+
+    return TTSOptions(
+        request_id=event.request_id,
+        text=event.text,
+        voice_id=voice_id,
+        quality=event.quality,
+        top_k=event.top_k,
+        repetition_penalty=event.repetition_penalty,
+        max_gen_len=event.max_gen_len,
+        **profile_options,
+    )
