@@ -175,6 +175,17 @@ def test_tts_quality_profile_and_explicit_overrides(tmp_path):
             )
             assert high_chunks[0]["generated_tokens"] == 64
 
+            cpu_smooth_chunks = _collect_tts_chunks(
+                ws,
+                {
+                    "type": "tts.speak",
+                    "request_id": "tts-cpu-smooth",
+                    "text": "hello",
+                    "quality": "cpu-smooth",
+                },
+            )
+            assert cpu_smooth_chunks[0]["generated_tokens"] == 64
+
             override_chunks = _collect_tts_chunks(
                 ws,
                 {

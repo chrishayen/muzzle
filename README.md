@@ -66,6 +66,14 @@ Replay it with PipeWire:
 pw-cat --playback --raw --format s16 --rate 24000 --channels 1 /tmp/muzzle-example.pcm
 ```
 
+Play and benchmark streaming TTS directly on CPU, without starting the API server or STT model:
+
+```bash
+make example-tts-cpu
+```
+
+The CPU example uses the `cpu-smooth` quality profile, plays through `pw-cat` when PipeWire is available, prints the resolved `chunk_tokens` and `crossfade_ms`, prints per-chunk timing, and ends with a final `speed=` value. `speed=1.00x` means the model generated one second of audio per wall-clock second; values near or above `1.00x` are near real time. Use `CPU_QUALITY=fast`, `CPU_QUALITY=balanced`, or `CPU_QUALITY=high` to compare other profiles, `CROSSFADE_MS=40 CHUNK_TOKENS=64` to tune chunk joins manually, `LATENCY_MS=500` to test whether live playback is underrunning, `PLAYER=none` to disable playback, and `PCM_OUT=/tmp/muzzle-cpu.pcm` to save the streamed audio.
+
 ## Try STT
 
 With `make dev` running:
@@ -145,6 +153,7 @@ Profiles:
 | `fast` | lowest latency | rougher chunk joins |
 | `balanced` | default interactive use | moderate latency |
 | `high` | smoother audio | higher latency |
+| `cpu-smooth` | CPU streaming tests | smoother joins with larger chunks |
 
 You can still override generation knobs directly:
 

@@ -3,16 +3,21 @@ PORT ?= 8000
 UV ?= uv
 TORCH_BACKEND ?= auto
 API_URL ?= ws://127.0.0.1:$(PORT)/v1/sessions
-TEXT ?= Hello from muzzle, streaming through deez nuts in yo face, bee-atch.
+TEXT ?= Hello from Muzzle, streaming text to speech in small chunks.
 QUALITY ?= balanced
+CPU_QUALITY ?= cpu-smooth
 PLAYER ?= auto
+LATENCY_MS ?= 120
+CHUNK_TOKENS ?=
+CROSSFADE_MS ?=
 PCM_OUT ?=
 PCM_ARGS = $(if $(PCM_OUT),--save-pcm "$(PCM_OUT)",)
+TTS_KNOB_ARGS = $(if $(CHUNK_TOKENS),--chunk-tokens "$(CHUNK_TOKENS)",) $(if $(CROSSFADE_MS),--crossfade-ms "$(CROSSFADE_MS)",)
 STT_SECONDS ?= 10
 STT_INPUT ?=
 STT_ARGS = $(if $(STT_INPUT),--input-pcm "$(STT_INPUT)",--duration-seconds "$(STT_SECONDS)")
 
-.PHONY: help sync sync-real check-real-deps torch-reinstall torch-check test dev dev-real dev-fake example-tts example-stt example-pcm docker-build docker-build-real docker-test docker-run docker-run-fake docker-run-real
+.PHONY: help sync sync-real check-real-deps torch-reinstall torch-check test dev dev-real dev-fake example-tts example-tts-cpu example-stt example-pcm docker-build docker-build-real docker-test docker-run docker-run-fake docker-run-real
 
 help:
 	@printf '%s\n' \
@@ -22,9 +27,10 @@ help:
 		'  make torch-reinstall   Reinstall torch/torchaudio with uv torch backend selection' \
 		'  make torch-check       Print the installed torch/CUDA/GPU details' \
 		'  make test              Run fake-backend API contract tests' \
-			'  make dev               Run the real API service locally after sync-real' \
+		'  make dev               Run the real API service locally after sync-real' \
 		'  make dev-fake          Run fake API plumbing service locally' \
 		'  make example-tts       Call real /v1/sessions TTS and play through PipeWire' \
+		'  make example-tts-cpu   Play streaming TTS directly from CPU and print speed metrics' \
 		'  make example-stt       Record mic with PipeWire and stream it to real STT' \
 		'  make example-pcm       Save streamed real TTS as raw pcm_s16le for replay' \
 		'  make docker-test       Build and run fake-backend tests in Docker' \
@@ -62,7 +68,10 @@ dev-fake:
 	MUZZLE_MODEL_BACKEND=fake $(UV) run uvicorn muzzle.app:create_app --factory --reload --host 127.0.0.1 --port $(PORT)
 
 example-tts:
-	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --quality "$(QUALITY)" --player "$(PLAYER)" $(PCM_ARGS)
+	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --quality "$(QUALITY)" --player "$(PLAYER)" --latency-ms "$(LATENCY_MS)" $(TTS_KNOB_ARGS) $(PCM_ARGS)
+
+example-tts-cpu:
+	$(UV) run --no-sync python examples/stream_tts_cpu.py --text "$(TEXT)" --quality "$(CPU_QUALITY)" --player "$(PLAYER)" --latency-ms "$(LATENCY_MS)" $(TTS_KNOB_ARGS) $(PCM_ARGS)
 
 example-stt:
 	$(UV) run --no-sync python examples/stream_stt_pipewire.py --url "$(API_URL)" $(STT_ARGS)

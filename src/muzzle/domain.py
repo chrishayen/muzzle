@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-TTSQuality = Literal["fast", "balanced", "high"]
+TTSQuality = Literal["fast", "balanced", "high", "cpu-smooth"]
 
 TTS_QUALITY_PROFILES = {
     "fast": {
@@ -24,6 +24,12 @@ TTS_QUALITY_PROFILES = {
         "crossfade_ms": 36.0,
         "temperature": 0.65,
         "top_p": 0.9,
+    },
+    "cpu-smooth": {
+        "chunk_tokens": 64,
+        "crossfade_ms": 40.0,
+        "temperature": 0.8,
+        "top_p": 0.95,
     },
 }
 

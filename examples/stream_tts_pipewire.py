@@ -152,7 +152,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--url", default="ws://127.0.0.1:8000/v1/sessions")
     parser.add_argument("--text", default="Hello from muzzle, streaming through PipeWire on Hyprland.")
     parser.add_argument("--voice-id", default="default")
-    parser.add_argument("--quality", choices=["fast", "balanced", "high"], default="balanced")
+    parser.add_argument("--quality", choices=["fast", "balanced", "high", "cpu-smooth"], default="balanced")
     parser.add_argument("--auth-token", default=None)
     parser.add_argument("--player", choices=["auto", "pw-cat", "none"], default="auto")
     parser.add_argument("--latency-ms", type=int, default=120)
