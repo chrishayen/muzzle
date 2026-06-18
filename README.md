@@ -204,6 +204,13 @@ TORCH_BACKEND=cu128 make docker-build-real
 make docker-run
 ```
 
+Run CPU-only inference in Docker:
+
+```bash
+make docker-build-cpu
+make docker-run-cpu
+```
+
 Build a pinned CUDA image instead:
 
 ```bash
@@ -219,6 +226,7 @@ make docker-run-cu130
 ```
 
 The pinned images use `Dockerfile.cu128` and `Dockerfile.cu130`.
+The CPU image uses the shared `Dockerfile` with `UV_TORCH_BACKEND=cpu` and forces TTS/STT devices to `cpu` at runtime.
 
 Use an explicit `TORCH_BACKEND` when Docker cannot see the NVIDIA driver during build.
 

@@ -32,6 +32,18 @@ jobs:
               type=ref,event=branch
               type=ref,event=tag
               type=sha,prefix=sha-
+          - variant: cpu
+            dockerfile: Dockerfile
+            build_args: |
+              UV_SYNC_EXTRAS=--extra real --extra test
+              UV_SYNC_NO_INSTALL=--no-install-package torch --no-install-package torchaudio
+              REAL_BACKEND=1
+              UV_TORCH_BACKEND=cpu
+            tags: |
+              type=raw,value=cpu,enable={{is_default_branch}}
+              type=ref,event=branch,prefix=cpu-
+              type=ref,event=tag,prefix=cpu-
+              type=sha,prefix=cpu-sha-
           - variant: cu128
             dockerfile: Dockerfile.cu128
             build_args: |
