@@ -24,6 +24,7 @@ jobs:
             dockerfile: Dockerfile
             build_args: |
               UV_SYNC_EXTRAS=--extra real --extra test
+              UV_SYNC_NO_INSTALL=--no-install-package torch --no-install-package torchaudio
               REAL_BACKEND=1
               UV_TORCH_BACKEND=auto
             tags: |
@@ -35,6 +36,7 @@ jobs:
             dockerfile: Dockerfile.cu128
             build_args: |
               UV_SYNC_EXTRAS=--extra real --extra test
+              UV_SYNC_NO_INSTALL=--no-install-package torch --no-install-package torchaudio
             tags: |
               type=raw,value=cu128,enable={{is_default_branch}}
               type=ref,event=branch,prefix=cu128-
@@ -44,6 +46,7 @@ jobs:
             dockerfile: Dockerfile.cu130
             build_args: |
               UV_SYNC_EXTRAS=--extra real --extra test
+              UV_SYNC_NO_INSTALL=--no-install-package torch --no-install-package torchaudio
             tags: |
               type=raw,value=cu130,enable={{is_default_branch}}
               type=ref,event=branch,prefix=cu130-
@@ -53,6 +56,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune -af || true
+          df -h
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

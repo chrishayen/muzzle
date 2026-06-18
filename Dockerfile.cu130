@@ -17,20 +17,20 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ARG UV_SYNC_EXTRAS="--extra real --extra test"
+ARG UV_SYNC_NO_INSTALL="--no-install-package torch --no-install-package torchaudio"
 
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project ${UV_SYNC_EXTRAS}
+    uv sync --frozen --no-install-project ${UV_SYNC_EXTRAS} ${UV_SYNC_NO_INSTALL}
 
 COPY README.md ./
 COPY src ./src
 COPY tests ./tests
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen ${UV_SYNC_EXTRAS}
+    uv sync --frozen ${UV_SYNC_EXTRAS} ${UV_SYNC_NO_INSTALL}
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --torch-backend "$UV_TORCH_BACKEND" --upgrade --reinstall torch torchaudio
+RUN uv pip install --no-cache --torch-backend "$UV_TORCH_BACKEND" --upgrade torch torchaudio
 
 EXPOSE 8000
 

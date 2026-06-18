@@ -87,7 +87,7 @@ docker-build:
 	docker build --build-arg UV_SYNC_EXTRAS="--extra test" -t $(IMAGE) .
 
 docker-build-real:
-	docker build --build-arg UV_SYNC_EXTRAS="--extra real --extra test" --build-arg REAL_BACKEND=1 --build-arg UV_TORCH_BACKEND="$(TORCH_BACKEND)" -t $(IMAGE)-real .
+	docker build --build-arg UV_SYNC_EXTRAS="--extra real --extra test" --build-arg UV_SYNC_NO_INSTALL="--no-install-package torch --no-install-package torchaudio" --build-arg REAL_BACKEND=1 --build-arg UV_TORCH_BACKEND="$(TORCH_BACKEND)" -t $(IMAGE)-real .
 
 docker-build-cu128:
 	docker build -f Dockerfile.cu128 -t $(IMAGE)-cu128 .

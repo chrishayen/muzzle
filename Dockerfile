@@ -15,24 +15,24 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ARG UV_SYNC_EXTRAS="--extra test"
+ARG UV_SYNC_NO_INSTALL=""
 ARG REAL_BACKEND=0
 ARG UV_TORCH_BACKEND=auto
 ENV UV_TORCH_BACKEND=${UV_TORCH_BACKEND}
 
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project ${UV_SYNC_EXTRAS}
+    uv sync --frozen --no-install-project ${UV_SYNC_EXTRAS} ${UV_SYNC_NO_INSTALL}
 
 COPY README.md ./
 COPY src ./src
 COPY tests ./tests
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen ${UV_SYNC_EXTRAS}
+    uv sync --frozen ${UV_SYNC_EXTRAS} ${UV_SYNC_NO_INSTALL}
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    if [ "$REAL_BACKEND" = "1" ]; then \
-        uv pip install --torch-backend "$UV_TORCH_BACKEND" --upgrade --reinstall torch torchaudio; \
+RUN if [ "$REAL_BACKEND" = "1" ]; then \
+        uv pip install --no-cache --torch-backend "$UV_TORCH_BACKEND" --upgrade torch torchaudio; \
     fi
 
 EXPOSE 8000
