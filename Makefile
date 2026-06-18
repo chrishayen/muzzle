@@ -17,7 +17,7 @@ STT_SECONDS ?= 10
 STT_INPUT ?=
 STT_ARGS = $(if $(STT_INPUT),--input-pcm "$(STT_INPUT)",--duration-seconds "$(STT_SECONDS)")
 
-.PHONY: help sync sync-real check-real-deps torch-reinstall torch-check test dev dev-real dev-fake example-tts example-tts-cpu example-stt example-pcm docker-build docker-build-real docker-test docker-run docker-run-fake docker-run-real
+.PHONY: help sync sync-real check-real-deps torch-reinstall torch-check test dev dev-real dev-fake example-tts example-tts-cpu example-stt example-pcm docker-build docker-build-real docker-build-cu128 docker-build-cu130 docker-test docker-run docker-run-fake docker-run-real docker-run-cu128 docker-run-cu130
 
 help:
 	@printf '%s\n' \
@@ -36,6 +36,10 @@ help:
 		'  make docker-test       Build and run fake-backend tests in Docker' \
 		'  make docker-run        Run real API service in Docker' \
 		'  make docker-run-fake   Run fake API plumbing service in Docker' \
+		'  make docker-build-cu128  Build pinned CUDA 12.8 real image' \
+		'  make docker-build-cu130  Build pinned CUDA 13.0 real image' \
+		'  make docker-run-cu128    Run pinned CUDA 12.8 real image' \
+		'  make docker-run-cu130    Run pinned CUDA 13.0 real image' \
 		'' \
 		'Variables:' \
 		'  TORCH_BACKEND=auto     uv torch backend for real installs; override with cu128/cu130/etc'
@@ -85,6 +89,12 @@ docker-build:
 docker-build-real:
 	docker build --build-arg UV_SYNC_EXTRAS="--extra real --extra test" --build-arg REAL_BACKEND=1 --build-arg UV_TORCH_BACKEND="$(TORCH_BACKEND)" -t $(IMAGE)-real .
 
+docker-build-cu128:
+	docker build -f Dockerfile.cu128 -t $(IMAGE)-cu128 .
+
+docker-build-cu130:
+	docker build -f Dockerfile.cu130 -t $(IMAGE)-cu130 .
+
 docker-test: docker-build
 	docker run --rm -e MUZZLE_MODEL_BACKEND=fake $(IMAGE) uv run --frozen --extra test pytest -q
 
@@ -95,3 +105,9 @@ docker-run: docker-run-real
 
 docker-run-real: docker-build-real
 	docker run --rm -it -p $(PORT):8000 -e MUZZLE_MODEL_BACKEND=real $(IMAGE)-real
+
+docker-run-cu128: docker-build-cu128
+	docker run --rm -it --gpus all -p $(PORT):8000 $(IMAGE)-cu128
+
+docker-run-cu130: docker-build-cu130
+	docker run --rm -it --gpus all -p $(PORT):8000 $(IMAGE)-cu130

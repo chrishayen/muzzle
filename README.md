@@ -204,6 +204,22 @@ TORCH_BACKEND=cu128 make docker-build-real
 make docker-run
 ```
 
+Build a pinned CUDA image instead:
+
+```bash
+make docker-build-cu128
+make docker-build-cu130
+```
+
+Run one with GPU access:
+
+```bash
+make docker-run-cu128
+make docker-run-cu130
+```
+
+The pinned images use `Dockerfile.cu128` and `Dockerfile.cu130`.
+
 Use an explicit `TORCH_BACKEND` when Docker cannot see the NVIDIA driver during build.
 
 ## Testing
