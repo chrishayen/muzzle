@@ -1,37 +1,76 @@
 # syntax=docker/dockerfile:1
 
-FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
-
+ARG CUDA_BASE_IMAGE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+FROM ${CUDA_BASE_IMAGE} AS builder
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_LINK_MODE=copy \
-    UV_TORCH_BACKEND=cu128 \
+    PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
+ARG TORCH_VERSION=2.11.0
+ARG TORCHAUDIO_VERSION=2.11.0
+ARG CUDA_BINDINGS_REQUIREMENT="cuda-bindings<13,>=12.9.4"
+ARG CUDA_RUNTIME_PACKAGES="cuda-cupti-12-8 libcusparselt0-cuda-12 libnvshmem3-cuda-12 libnccl2=2.28.9-1+cuda12.9"
+ARG CHATTERBOX_TTS_REQUIREMENT="chatterbox-tts @ git+https://github.com/chrishayen/chatterbox.git@ce5a900dbdbc776eeb3d00c1c1607143c7604a5b"
+ARG PERTH_REQUIREMENT="resemble-perth @ git+https://github.com/resemble-ai/Perth.git@master"
+ARG S3TOKENIZER_REQUIREMENT=s3tokenizer
+ARG SILERO_VAD_REQUIREMENT="silero-vad>=6.0.0"
+ARG CONFORMER_REQUIREMENT="conformer==0.3.2"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m venv "$VIRTUAL_ENV" \
+    && python -m pip install --upgrade pip "setuptools<82" wheel
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+COPY docker/requirements-real.txt ./docker/requirements-real.txt
+COPY docker/requirements-torch-cuda.txt ./docker/requirements-torch-cuda.txt
+
+RUN python -m pip install . \
+    && python -m pip install --index-url "$PYTORCH_INDEX_URL" --no-deps "torch==$TORCH_VERSION" "torchaudio==$TORCHAUDIO_VERSION" \
+    && python -m pip install -r docker/requirements-torch-cuda.txt "$CUDA_BINDINGS_REQUIREMENT" \
+    && python -m pip install -r docker/requirements-real.txt \
+    && python -m pip install --no-deps "$SILERO_VAD_REQUIREMENT" "$CONFORMER_REQUIREMENT" \
+    && python -m pip install --no-deps "$S3TOKENIZER_REQUIREMENT" \
+    && python -m pip install --no-deps "$PERTH_REQUIREMENT" \
+    && python -m pip install --no-deps "$CHATTERBOX_TTS_REQUIREMENT"
+
+RUN rm -rf \
+        /opt/venv/lib/python*/site-packages/torch/include \
+        /opt/venv/lib/python*/site-packages/torch/share/cmake \
+        /opt/venv/lib/python*/site-packages/torch/test \
+    && find /opt/venv -type d -name __pycache__ -prune -exec rm -rf {} +
+
+FROM ${CUDA_BASE_IMAGE} AS runtime
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
     MUZZLE_HOST=0.0.0.0 \
     MUZZLE_PORT=8000 \
     MUZZLE_MODEL_BACKEND=real
 
+ARG CUDA_RUNTIME_PACKAGES="cuda-cupti-12-8 libcusparselt0-cuda-12 libnvshmem3-cuda-12 libnccl2=2.28.9-1+cuda12.9"
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git \
+    && apt-get install -y --allow-change-held-packages --no-install-recommends ca-certificates python3 $CUDA_RUNTIME_PACKAGES \
     && rm -rf /var/lib/apt/lists/*
 
-ARG UV_SYNC_EXTRAS="--extra real --extra test"
-ARG UV_SYNC_NO_INSTALL="--no-install-package torch --no-install-package torchaudio"
+ENV LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu/libcusparseLt/12:/usr/lib/x86_64-linux-gnu/nvshmem/12:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/cuda-12.8/targets/x86_64-linux/lib:${LD_LIBRARY_PATH}"
 
-COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project ${UV_SYNC_EXTRAS} ${UV_SYNC_NO_INSTALL}
-
+COPY --from=builder /opt/venv /opt/venv
 COPY README.md ./
 COPY src ./src
-COPY tests ./tests
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen ${UV_SYNC_EXTRAS} ${UV_SYNC_NO_INSTALL}
-
-RUN uv pip install --no-cache --torch-backend "$UV_TORCH_BACKEND" --upgrade torch torchaudio
 
 EXPOSE 8000
 
-CMD ["uv", "run", "--no-sync", "uvicorn", "muzzle.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "muzzle.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

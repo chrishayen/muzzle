@@ -200,7 +200,6 @@ make docker-test
 Run the service in Docker:
 
 ```bash
-TORCH_BACKEND=cu128 make docker-build-real
 make docker-run
 ```
 
@@ -226,9 +225,11 @@ make docker-run-cu130
 ```
 
 The pinned images use `Dockerfile.cu128` and `Dockerfile.cu130`.
-The CPU image uses the shared `Dockerfile` with `UV_TORCH_BACKEND=cpu` and forces TTS/STT devices to `cpu` at runtime.
+They are based on NVIDIA CUDA cuDNN runtime images, and PyTorch is installed without its vendored CUDA wheel dependencies.
+The CPU image uses the shared `Dockerfile` with the PyTorch CPU wheel index and forces TTS/STT devices to `cpu` at runtime.
 
-Use an explicit `TORCH_BACKEND` when Docker cannot see the NVIDIA driver during build.
+Local Docker tags are `muzzle:fake`, `muzzle:cpu`, `muzzle:cu128`, and `muzzle:cu130`. `muzzle:latest` is an alias for the CPU image.
+Docker builds install PyTorch from explicit PyTorch wheel indexes and pin matching `torch` and `torchaudio` versions with `DOCKER_TORCH_VERSION`, which defaults to `2.11.0`.
 
 ## Testing
 

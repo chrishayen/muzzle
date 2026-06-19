@@ -1,7 +1,16 @@
-IMAGE ?= muzzle:dev
+IMAGE ?= muzzle
+DOCKER_FAKE_IMAGE ?= $(IMAGE):fake
+DOCKER_CPU_IMAGE ?= $(IMAGE):cpu
+DOCKER_LATEST_IMAGE ?= $(IMAGE):latest
+DOCKER_CU128_IMAGE ?= $(IMAGE):cu128
+DOCKER_CU130_IMAGE ?= $(IMAGE):cu130
 PORT ?= 8000
 UV ?= uv
 TORCH_BACKEND ?= auto
+DOCKER_TORCH_VERSION ?= 2.11.0
+DOCKER_TORCHAUDIO_VERSION ?= $(DOCKER_TORCH_VERSION)
+DOCKER_CU128_BASE_IMAGE ?= nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+DOCKER_CU130_BASE_IMAGE ?= nvidia/cuda:13.0.3-cudnn-runtime-ubuntu24.04
 API_URL ?= ws://127.0.0.1:$(PORT)/v1/sessions
 TEXT ?= Hello from Muzzle, streaming text to speech in small chunks.
 QUALITY ?= balanced
@@ -34,7 +43,7 @@ help:
 		'  make example-stt       Record mic with PipeWire and stream it to real STT' \
 		'  make example-pcm       Save streamed real TTS as raw pcm_s16le for replay' \
 		'  make docker-test       Build and run fake-backend tests in Docker' \
-		'  make docker-run        Run real API service in Docker' \
+		'  make docker-run        Run CPU real API service in Docker' \
 		'  make docker-run-fake   Run fake API plumbing service in Docker' \
 		'  make docker-build-cpu   Build CPU-only real image' \
 		'  make docker-run-cpu     Run CPU-only real image' \
@@ -44,7 +53,11 @@ help:
 		'  make docker-run-cu130    Run pinned CUDA 13.0 real image' \
 		'' \
 		'Variables:' \
-		'  TORCH_BACKEND=auto     uv torch backend for real installs; override with cu128/cu130/etc'
+		'  IMAGE=muzzle             Docker repository name; variant is the tag' \
+		'  TORCH_BACKEND=auto       uv torch backend for local real installs; override with cu128/cu130/etc' \
+		'  DOCKER_TORCH_VERSION=2.11.0 Docker torch/torchaudio version' \
+		'  DOCKER_CU128_BASE_IMAGE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04' \
+		'  DOCKER_CU130_BASE_IMAGE=nvidia/cuda:13.0.3-cudnn-runtime-ubuntu24.04'
 
 sync:
 	$(UV) sync --extra test
@@ -86,36 +99,34 @@ example-pcm:
 	$(UV) run --no-sync python examples/stream_tts_pipewire.py --url "$(API_URL)" --text "$(TEXT)" --quality "$(QUALITY)" --player none --save-pcm "$(if $(PCM_OUT),$(PCM_OUT),/tmp/muzzle-example.pcm)"
 
 docker-build:
-	docker build --build-arg UV_SYNC_EXTRAS="--extra test" -t $(IMAGE) .
+	docker build --target test-runtime --build-arg INSTALL_TEST=1 -t $(DOCKER_FAKE_IMAGE) .
 
-docker-build-real:
-	docker build --build-arg UV_SYNC_EXTRAS="--extra real --extra test" --build-arg UV_SYNC_NO_INSTALL="--no-install-package torch --no-install-package torchaudio" --build-arg REAL_BACKEND=1 --build-arg UV_TORCH_BACKEND="$(TORCH_BACKEND)" -t $(IMAGE)-real .
+docker-build-real: docker-build-cpu
 
 docker-build-cpu:
-	docker build --build-arg UV_SYNC_EXTRAS="--extra real --extra test" --build-arg UV_SYNC_NO_INSTALL="--no-install-package torch --no-install-package torchaudio" --build-arg REAL_BACKEND=1 --build-arg UV_TORCH_BACKEND=cpu -t $(IMAGE)-cpu .
+	docker build --build-arg INSTALL_REAL=1 --build-arg INSTALL_TEST=0 --build-arg PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cpu --build-arg TORCH_VERSION="$(DOCKER_TORCH_VERSION)" --build-arg TORCHAUDIO_VERSION="$(DOCKER_TORCHAUDIO_VERSION)" -t $(DOCKER_CPU_IMAGE) -t $(DOCKER_LATEST_IMAGE) .
 
 docker-build-cu128:
-	docker build -f Dockerfile.cu128 -t $(IMAGE)-cu128 .
+	docker build -f Dockerfile.cu128 --build-arg CUDA_BASE_IMAGE="$(DOCKER_CU128_BASE_IMAGE)" --build-arg TORCH_VERSION="$(DOCKER_TORCH_VERSION)" --build-arg TORCHAUDIO_VERSION="$(DOCKER_TORCHAUDIO_VERSION)" -t $(DOCKER_CU128_IMAGE) .
 
 docker-build-cu130:
-	docker build -f Dockerfile.cu130 -t $(IMAGE)-cu130 .
+	docker build -f Dockerfile.cu130 --build-arg CUDA_BASE_IMAGE="$(DOCKER_CU130_BASE_IMAGE)" --build-arg TORCH_VERSION="$(DOCKER_TORCH_VERSION)" --build-arg TORCHAUDIO_VERSION="$(DOCKER_TORCHAUDIO_VERSION)" -t $(DOCKER_CU130_IMAGE) .
 
 docker-test: docker-build
-	docker run --rm -e MUZZLE_MODEL_BACKEND=fake $(IMAGE) uv run --frozen --extra test pytest -q
+	docker run --rm -e MUZZLE_MODEL_BACKEND=fake $(DOCKER_FAKE_IMAGE) pytest -q
 
 docker-run-fake: docker-build
-	docker run --rm -it -p $(PORT):8000 -e MUZZLE_MODEL_BACKEND=fake $(IMAGE)
+	docker run --rm -it -p $(PORT):8000 -e MUZZLE_MODEL_BACKEND=fake $(DOCKER_FAKE_IMAGE)
 
-docker-run: docker-run-real
+docker-run: docker-run-cpu
 
-docker-run-real: docker-build-real
-	docker run --rm -it -p $(PORT):8000 -e MUZZLE_MODEL_BACKEND=real $(IMAGE)-real
+docker-run-real: docker-run-cpu
 
 docker-run-cpu: docker-build-cpu
-	docker run --rm -it -p $(PORT):8000 -e MUZZLE_MODEL_BACKEND=real -e MUZZLE_TTS_DEVICE=cpu -e MUZZLE_WHISPER_DEVICE=cpu $(IMAGE)-cpu
+	docker run --rm -it -p $(PORT):8000 -e MUZZLE_MODEL_BACKEND=real -e MUZZLE_TTS_DEVICE=cpu -e MUZZLE_WHISPER_DEVICE=cpu $(DOCKER_CPU_IMAGE)
 
 docker-run-cu128: docker-build-cu128
-	docker run --rm -it --gpus all -p $(PORT):8000 $(IMAGE)-cu128
+	docker run --rm -it --gpus all -p $(PORT):8000 $(DOCKER_CU128_IMAGE)
 
 docker-run-cu130: docker-build-cu130
-	docker run --rm -it --gpus all -p $(PORT):8000 $(IMAGE)-cu130
+	docker run --rm -it --gpus all -p $(PORT):8000 $(DOCKER_CU130_IMAGE)
